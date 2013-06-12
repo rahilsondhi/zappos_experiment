@@ -1,0 +1,144 @@
+<!doctype>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Rahil Sondhi &amp; Zappos Labs</title>
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap-responsive.css">
+</head>
+<body>
+  <div id="fb-root"></div>
+
+  <div id="header">
+    <a class="js-login">Login with Facebook</a>
+  </div>
+
+  <div id="content"></div>
+
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.1/jquery.min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.4.4/underscore-min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/backbone.js/1.0.0/backbone-min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/backbone.marionette/1.0.1-bundled/backbone.marionette.min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/1.0.0/handlebars.min.js"></script>
+  <script>
+    window.fbAsyncInit = function() {
+      // init the FB JS SDK
+      FB.init({
+        appId      : '460848607334962',                        // App ID from the app dashboard
+        status     : true,                                     // Check Facebook Login status
+        xfbml      : true                                      // Look for social plugins on the page
+      });
+
+      // Additional initialization code such as adding Event Listeners goes here
+    };
+
+    // Load the SDK asynchronously
+    (function(d, s, id){
+       var js, fjs = d.getElementsByTagName(s)[0];
+       if (d.getElementById(id)) {return;}
+       js = d.createElement(s); js.id = id;
+       js.src = "//connect.facebook.net/en_US/all.js";
+       fjs.parentNode.insertBefore(js, fjs);
+     }(document, 'script', 'facebook-jssdk'));
+  </script>
+  <script>
+    //
+    // Global namespace
+    //
+
+    window.ZL = new Backbone.Marionette.Application()
+
+    //
+    // Router
+    //
+
+
+    //
+    // Models and collections
+    //
+
+    var Friend = Backbone.Model.extend({
+
+    });
+
+    var Friends = Backbone.Collection.extend({
+      model: Friend
+    });
+
+    //
+    // Views
+    //
+
+    var FriendView = Backbone.Marionette.ItemView.extend({
+      template: '#friend-template',
+      className: 'friend'
+    });
+
+    var FriendsView = Backbone.Marionette.CollectionView.extend({
+      itemView: FriendView
+    });
+
+    //
+    // Marionette + Handlebars
+    // See https://github.com/marionettejs/backbone.marionette/wiki/Using-handlebars-templates-with-marionette
+    //
+
+    Backbone.Marionette.TemplateCache.prototype.compileTemplate = function(rawTemplate) {
+      return Handlebars.compile(rawTemplate);
+    };
+
+    //
+    // Handle Login with Facebook button
+    //
+
+    $('.js-login').click(function() {
+      console.log('Clicked login button');
+
+      FB.login(function(response) {
+        if (response.authResponse) {
+         console.log('Welcome!  Fetching your information.... ');
+         FB.api('/me?fields=id,name,friends.fields(birthday,name,location)', function(response) {
+           console.log('Good to see you, ' + response.name + '.');
+           ZL.friends = new Friends(response.friends.data);
+           ZL.start()
+         });
+        } else {
+         console.log('User cancelled login or did not fully authorize.');
+        }
+      }, {scope: 'friends_birthday,friends_location'});
+
+    });
+
+    //
+    // Backbone initializers
+    //
+
+    ZL.addInitializer(function() {
+      ZL.addRegions({
+        header: '#header',
+        content: '#content'
+      });
+    });
+
+    ZL.addInitializer(function() {
+      friendsView = new FriendsView({collection: ZL.friends});
+      ZL.content.show(friendsView);
+    });
+
+    ZL.on('initialize:after', function(options) {
+      console.log('Backbone app has been initialized');
+    });
+
+    //
+    // DOMContentLoaded
+    //
+
+    $(function() {
+      console.log('DCL');
+    });
+  </script>
+
+  <script id="friend-template" type="text/x-handlebars-template">
+    {{name}}
+  </script>
+</body>
+</html>
