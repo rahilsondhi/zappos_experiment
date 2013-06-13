@@ -12,13 +12,20 @@
     <a class="js-login">Login with Facebook</a>
   </div>
 
-  <div id="content"></div>
+  <div id="content">
+    <div class="row-fluid">
+      <div id="friends-list" class="span6"></div>
+      <div id="suggested-gifts" class="span6"></div>
+    </div>
+  </div>
 
   <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.1/jquery.min.js"></script>
   <script src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.4.4/underscore-min.js"></script>
   <script src="//cdnjs.cloudflare.com/ajax/libs/backbone.js/1.0.0/backbone-min.js"></script>
   <script src="//cdnjs.cloudflare.com/ajax/libs/backbone.marionette/1.0.1-bundled/backbone.marionette.min.js"></script>
   <script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/1.0.0/handlebars.min.js"></script>
+  <script src="js/convert_to_state_abbr.js"></script>
+  <script src="js/jquery.lazyload.min.js"></script>
   <script>
     window.fbAsyncInit = function() {
       // init the FB JS SDK
@@ -48,16 +55,13 @@
     window.ZL = new Backbone.Marionette.Application()
 
     //
-    // Router
-    //
-
-
-    //
     // Models and collections
     //
 
     var Friend = Backbone.Model.extend({
-
+      parse: function() {
+        console.log('if you see this, then you can massage state and gender');
+      }
     });
 
     var Friends = Backbone.Collection.extend({
@@ -67,17 +71,88 @@
       }
     });
 
+    var SuggestedGift = Backbone.Model.extend({
+
+    });
+
+    var SuggestedGifts = Backbone.Collection.extend({
+      initialize: function(options) {
+        if (options == null) {
+          var options = {};
+        }
+
+        // Convert gender to "M" and "F" (Zappos API requirement)
+        switch(options.gender) {
+          case 'male':
+            this.gender = 'M';
+            break;
+          case 'female':
+            this.gender = 'F';
+            break;
+          default:
+            this.gender = null;
+            break;
+        };
+
+        // Convert location to a two letter state code
+        if (_.isObject(options.location)) {
+          this.state = convertToStateAbbr(options.location.name);
+        } else {
+          this.state = null;
+        };
+      },
+      model: SuggestedGift,
+      url: function() {
+        if (this.gender != null && this.state != null) {
+          // Both gender and state are provided
+          return 'http://api.zappos.com/Statistics?type=latestStyles&filters={"gender":"'+ this.gender +'"}&location={"state":"'+ this.state +'"}&key=e2d70f1ead64bafbc86dae4064d789f94644b8ff&callback=?'
+        } else if (this.gender != null && this.state == null) {
+          // Only gender is provided
+          return 'http://api.zappos.com/Statistics?type=latestStyles&filters={"gender":"'+ this.gender +'"}&key=e2d70f1ead64bafbc86dae4064d789f94644b8ff&callback=?'
+        } else if (this.gender == null && this.state != null) {
+          // Only state is provided
+          return 'http://api.zappos.com/Statistics?type=latestStyles&location={"state":"'+ this.state +'"}&key=e2d70f1ead64bafbc86dae4064d789f94644b8ff&callback=?'
+        } else {
+          // No gender or state were provided
+          return 'http://api.zappos.com/Statistics?type=latestStyles&key=e2d70f1ead64bafbc86dae4064d789f94644b8ff&callback=?'
+        };
+      },
+      parse: function(response) {
+        return response.results
+      }
+    });
+
     //
     // Views
     //
 
     var FriendView = Backbone.Marionette.ItemView.extend({
       template: '#friend-template',
-      className: 'friend'
+      className: 'friend',
+      events: {
+        'click' : 'showSuggestedGifts'
+      },
+      showSuggestedGifts: function() {
+        suggestedGifts = new SuggestedGifts({gender: this.model.get('gender'), location: this.model.get('location')});
+        suggestedGifts.fetch().success(function() {
+          // TODO: Need some kind of loading spinner
+          suggestedGiftsView = new SuggestedGiftsView({collection: suggestedGifts});
+          ZL.suggestedGifts.show(suggestedGiftsView);
+        });
+      }
     });
 
     var FriendsView = Backbone.Marionette.CollectionView.extend({
       itemView: FriendView
+    });
+
+    var SuggestedGiftView = Backbone.Marionette.ItemView.extend({
+      template: '#suggested-gift-template',
+      className: 'suggested-gift'
+    });
+
+    var SuggestedGiftsView = Backbone.Marionette.CollectionView.extend({
+      itemView: SuggestedGiftView
     });
 
     //
@@ -90,7 +165,7 @@
     };
 
     //
-    // Handle Login with Facebook button
+    // Login with Facebook button
     //
 
     $('.js-login').click(function() {
@@ -99,16 +174,14 @@
       FB.login(function(response) {
         if (response.authResponse) {
          console.log('Welcome!  Fetching your information.... ');
-         FB.api('/me?fields=id,name,friends.fields(birthday,name,location)', function(response) {
+         FB.api('/me?fields=id,name,friends.fields(birthday,name,location,gender)', function(response) {
            console.log('Good to see you, ' + response.name + '.');
 
            // Massage the friends data
            // * Reject friends without birthdays
-           // * Sort by birthday closest to today
-           // * Change the year of everyone's birthday to 2013
+           // * TODO: Sort by birthday closest to today
            var friendsWithBirthdays = _.reject(response.friends.data, function(friend) { return friend.birthday == null });
            friendsWithBirthdays = _.sortBy(friendsWithBirthdays, function(friend) { return friend.birthday });
-           window.friends = friendsWithBirthdays; // TODO: this is temporary for debugging purposes
 
            // Instantiate a new Friends collection
            ZL.friends = new Friends(friendsWithBirthdays);
@@ -130,13 +203,14 @@
     ZL.addInitializer(function() {
       ZL.addRegions({
         header: '#header',
-        content: '#content'
+        friendsList: '#friends-list',
+        suggestedGifts: '#suggested-gifts'
       });
     });
 
     ZL.addInitializer(function() {
       friendsView = new FriendsView({collection: ZL.friends});
-      ZL.content.show(friendsView);
+      ZL.friendsList.show(friendsView);
     });
 
     ZL.on('initialize:after', function(options) {
@@ -153,7 +227,13 @@
   </script>
 
   <script id="friend-template" type="text/x-handlebars-template">
-    {{name}} | {{birthday}}
+    <img src="http://graph.facebook.com/{{id}}/picture" height="50" width="50" />
+    <p>{{name}} | {{gender}} | {{birthday}} | {{location.name}}</p>
+  </script>
+
+  <script id="suggested-gift-template" type="text/x-handlebars-template">
+    <img src="{{defaultImageUrl}}" height="75" width="75" />
+    <p><a href="{{defaultProductUrl}}">Someone just bought {{brandName}} {{productName}} for {{price}}</a></p>
   </script>
 </body>
 </html>
