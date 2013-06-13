@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Rahil Sondhi &amp; Zappos Labs</title>
-  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap-responsive.css">
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap.min.css">
 </head>
 <body>
   <div id="fb-root"></div>
@@ -61,7 +61,10 @@
     });
 
     var Friends = Backbone.Collection.extend({
-      model: Friend
+      model: Friend,
+      comparator: function(friend) {
+        friend.get('birthday')
+      }
     });
 
     //
@@ -98,7 +101,19 @@
          console.log('Welcome!  Fetching your information.... ');
          FB.api('/me?fields=id,name,friends.fields(birthday,name,location)', function(response) {
            console.log('Good to see you, ' + response.name + '.');
-           ZL.friends = new Friends(response.friends.data);
+
+           // Massage the friends data
+           // * Reject friends without birthdays
+           // * Sort by birthday closest to today
+           // * Change the year of everyone's birthday to 2013
+           var friendsWithBirthdays = _.reject(response.friends.data, function(friend) { return friend.birthday == null });
+           friendsWithBirthdays = _.sortBy(friendsWithBirthdays, function(friend) { return friend.birthday });
+           window.friends = friendsWithBirthdays; // TODO: this is temporary for debugging purposes
+
+           // Instantiate a new Friends collection
+           ZL.friends = new Friends(friendsWithBirthdays);
+
+           // Start the Backbone application
            ZL.start()
          });
         } else {
@@ -138,7 +153,7 @@
   </script>
 
   <script id="friend-template" type="text/x-handlebars-template">
-    {{name}}
+    {{name}} | {{birthday}}
   </script>
 </body>
 </html>
