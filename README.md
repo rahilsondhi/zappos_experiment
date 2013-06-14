@@ -19,7 +19,8 @@ To show Zappos that I can write code :)
 * Add a loading spinner when the user clicks on a friend's name
 * The friends list should be sorted so that the most recent birthday is first
 * Move the `FB.api()` call to a callback function of `FB.Event.subscribe('auth.login')`
-* Lazily load Facebook friend and Zappos product images
+* Lazily load Facebook friend and Zappos product images. They should be loaded as you scroll down the page
 * `app.js` is pretty large and should be broken up into separate files
 * If this app were bigger, the handlebars templates should be in their own `.hbs.jst` files instead of the .html file
 * Better UI (I barely spent time on the UI)
+* Use backbone.localstorage or a simple cookie to save your list of friends so you don't need to reconnect on every page load
