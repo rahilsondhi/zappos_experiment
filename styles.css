@@ -1,0 +1,35 @@
+a {
+  cursor: pointer;
+}
+
+.navbar-about {
+  margin-top: 10px;
+}
+
+#friends-list,
+#suggested-gifts {
+  position: fixed;
+  overflow: auto;
+  height: 100%;
+  top: 62px; /* Height of the navbar */
+}
+
+#friends-left {
+
+}
+
+#suggested-gifts {
+  left: 49%;
+}
+
+.friend,
+.suggested-gift {
+  margin: 0;
+  padding: 10px;
+}
+
+.friend:hover,
+.suggested-gift:hover {
+  background-color: #ebebeb;
+  cursor: pointer;
+}

@@ -2,14 +2,21 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Rahil Sondhi &amp; Zappos Labs</title>
+  <title>Zappos Statistics + Facebook Friends</title>
   <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap.min.css">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div id="fb-root"></div>
 
-  <div id="header">
-    <a class="js-login">Login with Facebook</a>
+  <div class="navbar" id="header">
+    <div class="navbar-inner">
+      <a class="brand">Zappos Statistics + Facebook Friends</a>
+      <ul class="nav">
+        <li><a class="js-login">Login with Facebook</a></li>
+      </ul>
+      <small class="navbar-about pull-right muted text-center">Made with <3 by <a href="http://rahil.ca">Rahil Sondhi</a>. See the source on <a href="https://github.com/rahilsondhi/zappos_experiment">GitHub</a>.</small>
+    </div>
   </div>
 
   <div id="content">
@@ -24,8 +31,7 @@
   <script src="//cdnjs.cloudflare.com/ajax/libs/backbone.js/1.0.0/backbone-min.js"></script>
   <script src="//cdnjs.cloudflare.com/ajax/libs/backbone.marionette/1.0.1-bundled/backbone.marionette.min.js"></script>
   <script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/1.0.0/handlebars.min.js"></script>
-  <script src="js/convert_to_state_abbr.js"></script>
-  <script src="js/jquery.lazyload.min.js"></script>
+  <script src="convert_to_state_abbr.js"></script>
   <script>
     window.fbAsyncInit = function() {
       // init the FB JS SDK
@@ -47,193 +53,28 @@
        fjs.parentNode.insertBefore(js, fjs);
      }(document, 'script', 'facebook-jssdk'));
   </script>
-  <script>
-    //
-    // Global namespace
-    //
-
-    window.ZL = new Backbone.Marionette.Application()
-
-    //
-    // Models and collections
-    //
-
-    var Friend = Backbone.Model.extend({
-      parse: function() {
-        console.log('if you see this, then you can massage state and gender');
-      }
-    });
-
-    var Friends = Backbone.Collection.extend({
-      model: Friend,
-      comparator: function(friend) {
-        friend.get('birthday')
-      }
-    });
-
-    var SuggestedGift = Backbone.Model.extend({
-
-    });
-
-    var SuggestedGifts = Backbone.Collection.extend({
-      initialize: function(options) {
-        if (options == null) {
-          var options = {};
-        }
-
-        // Convert gender to "M" and "F" (Zappos API requirement)
-        switch(options.gender) {
-          case 'male':
-            this.gender = 'M';
-            break;
-          case 'female':
-            this.gender = 'F';
-            break;
-          default:
-            this.gender = null;
-            break;
-        };
-
-        // Convert location to a two letter state code
-        if (_.isObject(options.location)) {
-          this.state = convertToStateAbbr(options.location.name);
-        } else {
-          this.state = null;
-        };
-      },
-      model: SuggestedGift,
-      url: function() {
-        if (this.gender != null && this.state != null) {
-          // Both gender and state are provided
-          return 'http://api.zappos.com/Statistics?type=latestStyles&filters={"gender":"'+ this.gender +'"}&location={"state":"'+ this.state +'"}&key=e2d70f1ead64bafbc86dae4064d789f94644b8ff&callback=?'
-        } else if (this.gender != null && this.state == null) {
-          // Only gender is provided
-          return 'http://api.zappos.com/Statistics?type=latestStyles&filters={"gender":"'+ this.gender +'"}&key=e2d70f1ead64bafbc86dae4064d789f94644b8ff&callback=?'
-        } else if (this.gender == null && this.state != null) {
-          // Only state is provided
-          return 'http://api.zappos.com/Statistics?type=latestStyles&location={"state":"'+ this.state +'"}&key=e2d70f1ead64bafbc86dae4064d789f94644b8ff&callback=?'
-        } else {
-          // No gender or state were provided
-          return 'http://api.zappos.com/Statistics?type=latestStyles&key=e2d70f1ead64bafbc86dae4064d789f94644b8ff&callback=?'
-        };
-      },
-      parse: function(response) {
-        return response.results
-      }
-    });
-
-    //
-    // Views
-    //
-
-    var FriendView = Backbone.Marionette.ItemView.extend({
-      template: '#friend-template',
-      className: 'friend',
-      events: {
-        'click' : 'showSuggestedGifts'
-      },
-      showSuggestedGifts: function() {
-        suggestedGifts = new SuggestedGifts({gender: this.model.get('gender'), location: this.model.get('location')});
-        suggestedGifts.fetch().success(function() {
-          // TODO: Need some kind of loading spinner
-          suggestedGiftsView = new SuggestedGiftsView({collection: suggestedGifts});
-          ZL.suggestedGifts.show(suggestedGiftsView);
-        });
-      }
-    });
-
-    var FriendsView = Backbone.Marionette.CollectionView.extend({
-      itemView: FriendView
-    });
-
-    var SuggestedGiftView = Backbone.Marionette.ItemView.extend({
-      template: '#suggested-gift-template',
-      className: 'suggested-gift'
-    });
-
-    var SuggestedGiftsView = Backbone.Marionette.CollectionView.extend({
-      itemView: SuggestedGiftView
-    });
-
-    //
-    // Marionette + Handlebars
-    // See https://github.com/marionettejs/backbone.marionette/wiki/Using-handlebars-templates-with-marionette
-    //
-
-    Backbone.Marionette.TemplateCache.prototype.compileTemplate = function(rawTemplate) {
-      return Handlebars.compile(rawTemplate);
-    };
-
-    //
-    // Login with Facebook button
-    //
-
-    $('.js-login').click(function() {
-      console.log('Clicked login button');
-
-      FB.login(function(response) {
-        if (response.authResponse) {
-         console.log('Welcome!  Fetching your information.... ');
-         FB.api('/me?fields=id,name,friends.fields(birthday,name,location,gender)', function(response) {
-           console.log('Good to see you, ' + response.name + '.');
-
-           // Massage the friends data
-           // * Reject friends without birthdays
-           // * TODO: Sort by birthday closest to today
-           var friendsWithBirthdays = _.reject(response.friends.data, function(friend) { return friend.birthday == null });
-           friendsWithBirthdays = _.sortBy(friendsWithBirthdays, function(friend) { return friend.birthday });
-
-           // Instantiate a new Friends collection
-           ZL.friends = new Friends(friendsWithBirthdays);
-
-           // Start the Backbone application
-           ZL.start()
-         });
-        } else {
-         console.log('User cancelled login or did not fully authorize.');
-        }
-      }, {scope: 'friends_birthday,friends_location'});
-
-    });
-
-    //
-    // Backbone initializers
-    //
-
-    ZL.addInitializer(function() {
-      ZL.addRegions({
-        header: '#header',
-        friendsList: '#friends-list',
-        suggestedGifts: '#suggested-gifts'
-      });
-    });
-
-    ZL.addInitializer(function() {
-      friendsView = new FriendsView({collection: ZL.friends});
-      ZL.friendsList.show(friendsView);
-    });
-
-    ZL.on('initialize:after', function(options) {
-      console.log('Backbone app has been initialized');
-    });
-
-    //
-    // DOMContentLoaded
-    //
-
-    $(function() {
-      console.log('DCL');
-    });
-  </script>
+  <script src="app.js"></script>
 
   <script id="friend-template" type="text/x-handlebars-template">
-    <img src="http://graph.facebook.com/{{id}}/picture" height="50" width="50" />
-    <p>{{name}} | {{gender}} | {{birthday}} | {{location.name}}</p>
+    <div class="pull-left">
+      <img src="http://graph.facebook.com/{{id}}/picture" class="media-object" height="50" width="50" />
+    </div>
+
+    <div class="media-body">
+      <h5 class="media-heading">{{name}}</h5>
+      <p>{{gender}} | {{birthday}} | {{location.name}}</p>
+    </div>
   </script>
 
   <script id="suggested-gift-template" type="text/x-handlebars-template">
-    <img src="{{defaultImageUrl}}" height="75" width="75" />
-    <p><a href="{{defaultProductUrl}}">Someone just bought {{brandName}} {{productName}} for {{price}}</a></p>
+    <div class="pull-left">
+      <img src="{{defaultImageUrl}}" class="media-object" height="75" width="75" />
+    </div>
+
+    <div class="media-body">
+      <h5 class="media-heading">{{brandName}}</h5>
+      <p><a href="{{defaultProductUrl}}">Someone just bought {{productName}} for {{price}}</a></p>
+    </div>
   </script>
 </body>
 </html>
